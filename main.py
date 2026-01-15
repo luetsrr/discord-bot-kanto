@@ -31,7 +31,7 @@ TOKEN = os.getenv('DISCORD_TOKEN')
 
 # ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼
 # 【重要】ここにGASで発行した「ウェブアプリのURL」を貼ってください
-GAS_URL = "https://script.google.com/macros/s/AKfycbxUGq8Jo0dLADQV63m0tJfLhDr-LbwTxzJXXe_WO-U9RApT8PgSoO8_D4ql8nofLecODA/exec"
+GAS_URL = "https://script.google.com/macros/s/AKfycbwIROkSxXvwObhgvUoODYiPBGwErRbpAioyGnXFoJw3AP4uraaVJJS6Xj1dq1RdPumfOg/exec"
 # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
 # --- Botの初期設定 ---
