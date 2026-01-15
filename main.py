@@ -58,8 +58,11 @@ def post_to_gas(to_email, subject, body):
 # ==========================================
 def send_entry_logic(to_email, name, year, month):
     subject = f"【うぃーすた関東】ご参加を承りました【{year}年{month}月例会】"
-    # 【修正】f""" の直後に改行を追加しました
-    body = "\u00A0\n\n" + f"""{name}　様
+    
+    # 【修正】全角スペース(\u3000) + 改行3つ(\n\n\n)
+    # これで「文字扱いされる空白」の後に「たっぷりと改行」を入れます。
+    # 多少削除されても必ず1行は隙間が残るはずです。
+    body = "\u3000\n\n\n" + f"""{name}　様
 
 
 お世話になっております。
@@ -95,25 +98,23 @@ Instagram：https://www.instagram.com/westu_kanto/
 # ==========================================
 def send_invite_logic(emails_str, year, month, url):
     recipient_list = [addr.strip() for addr in emails_str.split(',')]
-    count = 0
+    sent_emails = [] 
     
     subject = f"【うぃーすた関東】LINEオープンチャットへご参加お願いします【{year}年{month}月例会】"
-    # 【修正】f""" の直後に改行を追加しました
-    body = "\u00A0\n\n" + f"""{year}年{month}月例会に参加される皆さまへ
-
+    
+    # 【修正】こちらも全角スペース + 改行3つ
+    body = "\u3000\n\n\n" + f"""{year}年{month}月例会に参加される皆さまへ
 
 お世話になっております。
 
-この度はうぃーすた関東{year}年{month}月例会にご参加いただき、誠にありがとうございます。
+この度は、うぃーすた関東{year}年{month}月例会にご参加いただき、誠にありがとうございます。
 
 
 例会用LINEオープンチャットを作成しましたので、下記リンクよりお忘れなくご参加お願いします。
 
 {url}
 
-
 例会に関する今後のご連絡はこちらでさせていただきます。
-
 ※オープンチャット内でのお名前はお好きなもので構いません。
 
 
@@ -134,9 +135,9 @@ Instagram：https://www.instagram.com/westu_kanto/
     for email in recipient_list:
         if email:
             post_to_gas(email, subject, body)
-            count += 1
+            sent_emails.append(email)
             
-    return count
+    return sent_emails
 
 # ==========================================
 #  UI定義: ボタンを押した後の入力フォーム (Modal)
@@ -183,12 +184,11 @@ class EntryModal(ui.Modal, title='受付完了メール送信の確認'):
             )
             print(f"GAS経由で送信成功: {email}")
             
-            # 【追加】送信成功後、元のボタンがついたメッセージを削除する
             try:
                 await interaction.message.delete()
             except Exception:
-                pass # 既に消えていた場合などは無視
-                
+                pass
+
         except Exception as e:
             await interaction.followup.send(f"送信に失敗しました。\nエラー内容: {e}")
 
@@ -306,14 +306,31 @@ async def send_line_invite_command(
     await interaction.response.defer(ephemeral=False)
 
     try:
-        count = await asyncio.to_thread(send_invite_logic, emails, year, month, url)
+        sent_list = await asyncio.to_thread(send_invite_logic, emails, year, month, url)
+        count = len(sent_list)
+        
+        sent_list_str = "\n".join(sent_list)
 
-        await interaction.followup.send(
+        msg = (
             f"オプチャの招待リンクを一斉送信しました！\n"
             f"送信数: {count} 件\n"
             f"対象: {year}年{month}月\n"
-            f"リンク: {url}"
+            f"リンク: {url}\n\n"
+            f"送信先一覧:\n"
+            f"```\n{sent_list_str}\n```"
         )
+        
+        if len(msg) > 1900:
+            msg = (
+                f"オプチャの招待リンクを一斉送信しました！\n"
+                f"送信数: {count} 件\n"
+                f"対象: {year}年{month}月\n"
+                f"リンク: {url}\n\n"
+                f"送信先一覧:\n"
+                f"(人数が多すぎるため表示を省略しました)"
+            )
+
+        await interaction.followup.send(msg)
         print(f"GAS経由で一斉送信成功: {count}件")
 
     except Exception as e:
