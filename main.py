@@ -59,9 +59,7 @@ def post_to_gas(to_email, subject, body):
 def send_entry_logic(to_email, name, year, month):
     subject = f"【うぃーすた関東】ご参加を承りました【{year}年{month}月例会】"
     # 【修正】f""" の直後に改行を追加しました
-    body = f"""
-
-\n{name}　様
+    body = "\n\n" + f"""{name}　様
 
 
 お世話になっております。
@@ -101,14 +99,12 @@ def send_invite_logic(emails_str, year, month, url):
     
     subject = f"【うぃーすた関東】LINEオープンチャットへご参加お願いします【{year}年{month}月例会】"
     # 【修正】f""" の直後に改行を追加しました
-    body = f"""
-
-\n{year}年{month}月例会に参加される皆さまへ
+    body = "\n\n" + f"""{year}年{month}月例会に参加される皆さまへ
 
 
 お世話になっております。
 
-この度は、うぃーすた関東{year}年{month}月例会にご参加いただき、誠にありがとうございます。
+この度はうぃーすた関東{year}年{month}月例会にご参加いただき、誠にありがとうございます。
 
 
 例会用LINEオープンチャットを作成しましたので、下記リンクよりお忘れなくご参加お願いします。
@@ -186,6 +182,13 @@ class EntryModal(ui.Modal, title='受付完了メール送信の確認'):
                 f"対象: {year}年{month}月例会"
             )
             print(f"GAS経由で送信成功: {email}")
+            
+            # 【追加】送信成功後、元のボタンがついたメッセージを削除する
+            try:
+                await interaction.message.delete()
+            except Exception:
+                pass # 既に消えていた場合などは無視
+                
         except Exception as e:
             await interaction.followup.send(f"送信に失敗しました。\nエラー内容: {e}")
 
