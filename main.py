@@ -46,6 +46,7 @@ tree = app_commands.CommandTree(client)
 def send_via_gas(to_email, name, year, month):
     subject = f"【うぃーすた関東】ご参加を承りました【{year}年{month}月例会】"
     body = f"""
+
 {name}　様
 
 
@@ -109,6 +110,7 @@ def send_invite_via_gas(emails_str, year, month, url):
     # 件名と本文作成
     subject = f"【うぃーすた関東】LINEオープンチャットへご参加お願いします【{year}年{month}月例会】"
     body = f"""
+    
 {year}年{month}月例会に参加される皆さまへ
 
 お世話になっております。
@@ -154,7 +156,7 @@ Instagram：https://www.instagram.com/westu_kanto/
 # ==========================================
 #  UI定義: ボタンを押した後の入力フォーム (Modal)
 # ==========================================
-class EntryModal(ui.Modal, title='受付メール送信の確認'):
+class EntryModal(ui.Modal, title='受付完了メール送信の確認'):
     def __init__(self, default_email, default_name, default_year, default_month):
         super().__init__()
         self.email_input = ui.TextInput(label="メールアドレス", default=default_email)
