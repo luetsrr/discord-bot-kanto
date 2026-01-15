@@ -62,7 +62,7 @@ def send_entry_logic(to_email, name, year, month):
     # 【修正】全角スペース(\u3000) + 改行3つ(\n\n\n)
     # これで「文字扱いされる空白」の後に「たっぷりと改行」を入れます。
     # 多少削除されても必ず1行は隙間が残るはずです。
-    body = "\u3000\n\n\n" + f"""{name}　様
+    body = "\u2800\n\n" + f"""{name}　様
 
 
 お世話になっております。
@@ -103,7 +103,8 @@ def send_invite_logic(emails_str, year, month, url):
     subject = f"【うぃーすた関東】LINEオープンチャットへご参加お願いします【{year}年{month}月例会】"
     
     # 【修正】こちらも全角スペース + 改行3つ
-    body = "\u3000\n\n\n" + f"""{year}年{month}月例会に参加される皆さまへ
+    body = "\u2800\n\n" + f"""{year}年{month}月例会に参加される皆さまへ
+
 
 お世話になっております。
 
@@ -279,7 +280,7 @@ async def send_entry_command(
         
         await interaction.followup.send(
             f"受付完了メールを送信しました！\n"
-            f"メールアドレス: `{email_address}`\n"
+            f"送信先メールアドレス: `{email_address}`\n"
             f"ニックネーム: {user_name}\n"
             f"対象: {year}年{month}月例会"
         )
@@ -315,8 +316,8 @@ async def send_line_invite_command(
             f"オプチャの招待リンクを一斉送信しました！\n"
             f"送信数: {count} 件\n"
             f"対象: {year}年{month}月\n"
-            f"リンク: {url}\n\n"
-            f"送信先一覧:\n"
+            f"リンク: {url}\n"
+            f"送信先メールアドレス:\n"
             f"```\n{sent_list_str}\n```"
         )
         
@@ -325,8 +326,8 @@ async def send_line_invite_command(
                 f"オプチャの招待リンクを一斉送信しました！\n"
                 f"送信数: {count} 件\n"
                 f"対象: {year}年{month}月\n"
-                f"リンク: {url}\n\n"
-                f"送信先一覧:\n"
+                f"リンク: {url}\n"
+                f"送信先メールアドレス:\n"
                 f"(人数が多すぎるため表示を省略しました)"
             )
 
