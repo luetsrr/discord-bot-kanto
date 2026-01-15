@@ -158,9 +158,21 @@ class EntryModal(ui.Modal, title='受付メール送信の確認'):
     def __init__(self, default_email, default_name, default_year, default_month):
         super().__init__()
         self.email_input = ui.TextInput(label="メールアドレス", default=default_email)
-        self.name_input = ui.TextInput(label="お名前", default=default_name)
-        self.year_input = ui.TextInput(label="開催年", default=default_year, min_length=4, max_length=4)
-        self.month_input = ui.TextInput(label="開催月", default=default_month, min_length=1, max_length=2)
+        self.name_input = ui.TextInput(label="ニックネーム", default=default_name)
+        
+        # 【修正】入力制限を「2文字」に変更しました
+        self.year_input = ui.TextInput(
+            label="開催年", 
+            default=default_year, 
+            min_length=2, 
+            max_length=2
+        )
+        self.month_input = ui.TextInput(
+            label="開催月", 
+            default=default_month, 
+            min_length=1, 
+            max_length=2
+        )
 
         self.add_item(self.email_input)
         self.add_item(self.name_input)
@@ -224,10 +236,12 @@ async def on_message(message):
             name = name_match.group(1).strip() if name_match else ""
             
             if date_match:
-                year = date_match.group(1)
+                # 【修正】4桁(2026)から下2桁(26)だけを取り出す
+                year = date_match.group(1)[-2:]
                 month = date_match.group(2)
             else:
-                year = "2026"
+                # 【修正】デフォルトも26に変更
+                year = "26"
                 month = ""
 
             view = EntryButtonView(email, name, year, month)
