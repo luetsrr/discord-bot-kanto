@@ -4,7 +4,7 @@ from discord import ui
 import os
 import re
 import asyncio
-import requests # 追加: GASと通信するため
+import requests
 import json
 from dotenv import load_dotenv
 from flask import Flask
@@ -30,7 +30,7 @@ load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 
 # ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼
-# 【重要】ここにGASで発行した「ウェブアプリのURL」を貼ってください
+# GASのURL
 GAS_URL = "https://script.google.com/macros/s/AKfycbwIROkSxXvwObhgvUoODYiPBGwErRbpAioyGnXFoJw3AP4uraaVJJS6Xj1dq1RdPumfOg/exec"
 # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
@@ -41,10 +41,24 @@ client = discord.Client(intents=intents)
 tree = app_commands.CommandTree(client)
 
 # ==========================================
-#  共通関数: GAS経由でのメール送信ロジック
+#  【共通】GASへの送信リクエスト関数
 # ==========================================
-def send_via_gas(to_email, name, year, month):
+def post_to_gas(to_email, subject, body):
+    payload = {
+        "to": to_email,
+        "subject": subject,
+        "body": body
+    }
+    response = requests.post(GAS_URL, json=payload)
+    if response.status_code != 200:
+        raise Exception(f"GASエラー: {response.text}")
+
+# ==========================================
+#  ロジック: 受付メール送信 (send_entry)
+# ==========================================
+def send_entry_logic(to_email, name, year, month):
     subject = f"【うぃーすた関東】ご参加を承りました【{year}年{month}月例会】"
+    # 【修正】f""" の直後に改行を追加しました
     body = f"""
 
 {name}　様
@@ -75,43 +89,22 @@ X（旧 Twitter）：https://x.com/westu_kanto2
 Instagram：https://www.instagram.com/westu_kanto/
 ＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊
 """
-    # GASに送るデータをまとめる
-    payload = {
-        "to": to_email,
-        "subject": subject,
-        "body": body
-    }
-
-    # GASのURLにデータを投げる（HTTP POST）
-    response = requests.post(GAS_URL, json=payload)
-    
-    # 送信成功かチェック
-    if response.status_code != 200:
-        raise Exception(f"GASエラー: {response.text}")
-    
+    post_to_gas(to_email, subject, body)
     return body
 
 # ==========================================
-#  共通関数: LINE招待メール (GAS経由)
+#  ロジック: LINE招待送信 (send_line_invite)
 # ==========================================
-def send_invite_via_gas(emails_str, year, month, url):
+def send_invite_logic(emails_str, year, month, url):
     recipient_list = [addr.strip() for addr in emails_str.split(',')]
+    count = 0
     
-    # 自分のGmailアドレス（GAS側で実行者のメールアドレスが使われるため、ここでは取得不要だが念のため）
-    # ※GAS版では BCC送信のロジックを少し簡略化して「自分宛てに送る」形にします。
-    # 本格的にBCC送る場合はGAS側で recipient_list をループさせるか、Bccオプションを使う必要がありますが
-    # ここでは「自分宛て」にして、BCCリストはGAS側で処理させます。
-    
-    # 今回はシンプルに「1通ずつ送る」か「BCCを使う」かですが、
-    # GASの仕様上、BCC指定送信機能を追加する必要があります。
-    # ★一旦、個別メールと同じ関数を使いますが、一斉送信に対応させるため
-    # GAS側のコード修正なしで動くよう「GASへのリクエストを工夫」します。
-    
-    # 件名と本文作成
     subject = f"【うぃーすた関東】LINEオープンチャットへご参加お願いします【{year}年{month}月例会】"
+    # 【修正】f""" の直後に改行を追加しました
     body = f"""
-    
+
 {year}年{month}月例会に参加される皆さまへ
+
 
 お世話になっております。
 
@@ -122,7 +115,9 @@ def send_invite_via_gas(emails_str, year, month, url):
 
 {url}
 
+
 例会に関する今後のご連絡はこちらでさせていただきます。
+
 ※オープンチャット内でのお名前はお好きなもので構いません。
 
 
@@ -140,18 +135,12 @@ Instagram：https://www.instagram.com/westu_kanto/
 ＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊
 """
     
-    # 自分宛てにして、BCCに全員を入れる（GASの sendEmail は bcc オプション対応）
-    # ただし、先ほどのGASコードは単純な to/subject/body しか受け取っていません。
-    # ★一斉送信もGASでやりたい場合、GASコードを少しリッチにする必要がありますが、
-    # まずは「個別送信」のエラー回避を優先します。
-    
-    # ここでは簡易的に「自分宛て」に送信し、BCCは使わず
-    # 運用回避案として「送信完了しました」と表示だけする形にしますか？
-    # いや、せっかくなのでGAS側もbcc対応させましょう。
-    
-    # ★GAS側を変更したくない場合、ここでの実装は難しいです。
-    # ですが、個別送信（send_entry）がメインのご要望と推測し、まずはそちらを完璧にします。
-    pass 
+    for email in recipient_list:
+        if email:
+            post_to_gas(email, subject, body)
+            count += 1
+            
+    return count
 
 # ==========================================
 #  UI定義: ボタンを押した後の入力フォーム (Modal)
@@ -162,7 +151,6 @@ class EntryModal(ui.Modal, title='受付完了メール送信の確認'):
         self.email_input = ui.TextInput(label="メールアドレス", default=default_email)
         self.name_input = ui.TextInput(label="ニックネーム", default=default_name)
         
-        # 【修正】入力制限を「2文字」に変更しました
         self.year_input = ui.TextInput(
             label="開催年", 
             default=default_year, 
@@ -189,11 +177,10 @@ class EntryModal(ui.Modal, title='受付完了メール送信の確認'):
             year = int(self.year_input.value)
             month = int(self.month_input.value)
 
-            # 【重要】GAS経由で送信（非同期実行でBotを止めない）
-            await asyncio.to_thread(send_via_gas, email, name, year, month)
+            await asyncio.to_thread(send_entry_logic, email, name, year, month)
 
             await interaction.followup.send(
-                f"受付メールを送信しました！\n"
+                f"受付完了メールを送信しました！\n"
                 f"メールアドレス: `{email}`\n"
                 f"ニックネーム: {name}\n"
                 f"対象: {year}年{month}月例会"
@@ -238,11 +225,9 @@ async def on_message(message):
             name = name_match.group(1).strip() if name_match else ""
             
             if date_match:
-                # 【修正】4桁(2026)から下2桁(26)だけを取り出す
                 year = date_match.group(1)[-2:]
                 month = date_match.group(2)
             else:
-                # 【修正】デフォルトも26に変更
                 year = "26"
                 month = ""
 
@@ -269,7 +254,7 @@ async def on_ready():
     print('※ephemeral=False 設定済み')
 
 # ==========================================
-#  既存コマンド1: 受付メール (send_entry)
+#  コマンド1: 受付メール (send_entry)
 # ==========================================
 @tree.command(name="send_entry", description="例会参加の受付完了メールを送信します")
 @app_commands.rename(
@@ -287,17 +272,50 @@ async def send_entry_command(
 ):
     await interaction.response.defer(ephemeral=False)
     try:
-        # GAS経由で送信
-        await asyncio.to_thread(send_via_gas, email_address, user_name, year, month)
+        await asyncio.to_thread(send_entry_logic, email_address, user_name, year, month)
         
         await interaction.followup.send(
-            f"受付メールを送信しました！\n"
+            f"受付完了メールを送信しました！\n"
             f"メールアドレス: `{email_address}`\n"
             f"ニックネーム: {user_name}\n"
             f"対象: {year}年{month}月例会"
         )
     except Exception as e:
         await interaction.followup.send(f"送信に失敗しました。\nエラー内容: {e}")
+
+# ==========================================
+#  コマンド2: LINE招待一斉送信 (send_line_invite)
+# ==========================================
+@tree.command(name="send_line_invite", description="LINEオープンチャットの招待リンクを一斉送信します")
+@app_commands.rename(
+    emails="メールアドレス",
+    year="開催年",
+    month="開催月",
+    url="オプチャの招待リンク"
+)
+async def send_line_invite_command(
+    interaction: discord.Interaction, 
+    emails: str, 
+    year: int, 
+    month: int, 
+    url: str
+):
+    await interaction.response.defer(ephemeral=False)
+
+    try:
+        count = await asyncio.to_thread(send_invite_logic, emails, year, month, url)
+
+        await interaction.followup.send(
+            f"オプチャの招待リンクを一斉送信しました！\n"
+            f"送信数: {count} 件\n"
+            f"対象: {year}年{month}月\n"
+            f"リンク: {url}"
+        )
+        print(f"GAS経由で一斉送信成功: {count}件")
+
+    except Exception as e:
+        await interaction.followup.send(f"送信に失敗しました。\nエラー内容: {e}")
+        print(f"エラー発生: {e}")
 
 # --- Botの起動 ---
 keep_alive()
