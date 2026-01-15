@@ -5,6 +5,7 @@ import smtplib
 from email.mime.text import MIMEText
 import os
 import re
+import asyncio # 【重要】これを追加
 from dotenv import load_dotenv
 from flask import Flask
 from threading import Thread
@@ -40,6 +41,7 @@ tree = app_commands.CommandTree(client)
 
 # ==========================================
 #  共通関数: メール送信ロジック
+#  (※重い処理なので asyncio.to_thread 経由で呼び出します)
 # ==========================================
 def send_gmail(to_email, name, year, month):
     subject = f"【うぃーすた関東】ご参加を承りました【{year}年{month}月例会】"
@@ -107,7 +109,8 @@ class EntryModal(ui.Modal, title='受付メール送信の確認'):
             year = int(self.year_input.value)
             month = int(self.month_input.value)
 
-            send_gmail(email, name, year, month)
+            # 【修正点】ここを非同期スレッド実行に変更
+            await asyncio.to_thread(send_gmail, email, name, year, month)
 
             # 元の指定通りのフォーマット
             await interaction.followup.send(
@@ -131,7 +134,7 @@ class EntryButtonView(ui.View):
         self.year = year
         self.month = month
 
-    @discord.ui.button(label="受付メールを作成", style=discord.ButtonStyle.primary, emoji="📝")
+    @discord.ui.button(label="受付完了メールを送信", style=discord.ButtonStyle.primary, emoji="📝")
     async def button_callback(self, interaction: discord.Interaction, button: discord.ui.Button):
         modal = EntryModal(self.email, self.name, self.year, self.month)
         await interaction.response.send_modal(modal)
@@ -161,7 +164,7 @@ async def on_message(message):
                 year = date_match.group(1)
                 month = date_match.group(2)
             else:
-                year = "2026"
+                year = "26"
                 month = ""
 
             view = EntryButtonView(email, name, year, month)
@@ -205,7 +208,9 @@ async def send_entry_command(
 ):
     await interaction.response.defer(ephemeral=False)
     try:
-        send_gmail(email_address, user_name, year, month)
+        # 【修正点】ここを非同期スレッド実行に変更
+        await asyncio.to_thread(send_gmail, email_address, user_name, year, month)
+        
         # 元の指定通りのフォーマット
         await interaction.followup.send(
             f"受付メールを送信しました！\n"
@@ -278,9 +283,14 @@ Instagram：https://www.instagram.com/westu_kanto/
         msg['To'] = GMAIL_USER 
         msg['Bcc'] = bcc_string
 
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-            server.login(GMAIL_USER, GMAIL_PASSWORD)
-            server.send_message(msg)
+        # メール送信処理を関数化して、裏で実行できるようにする
+        def send_invite_sync():
+            with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+                server.login(GMAIL_USER, GMAIL_PASSWORD)
+                server.send_message(msg)
+
+        # 【修正点】別スレッド実行
+        await asyncio.to_thread(send_invite_sync)
 
         # 元の指定通りのフォーマット
         await interaction.followup.send(
