@@ -1,14 +1,15 @@
 import discord
 from discord import app_commands
+from discord import ui
 import smtplib
 from email.mime.text import MIMEText
 import os
+import re
 from dotenv import load_dotenv
-
 from flask import Flask
 from threading import Thread
-import os
 
+# --- Webサーバー設定 (Flask) ---
 app = Flask('')
 
 @app.route('/')
@@ -16,7 +17,7 @@ def home():
     return "I am alive!"
 
 def run():
-    # Renderが指定するポートがあればそれを使い、なければ8080を使う
+    # Render環境のポート設定に対応
     port = int(os.getenv("PORT", 8080))
     app.run(host='0.0.0.0', port=port)
 
@@ -32,43 +33,18 @@ GMAIL_PASSWORD = os.getenv('GMAIL_APP_PASSWORD')
 
 # --- Botの初期設定 ---
 intents = discord.Intents.default()
+# 【重要】メッセージの中身を読む権限をONにする
+intents.message_content = True 
 client = discord.Client(intents=intents)
 tree = app_commands.CommandTree(client)
 
-@client.event
-async def on_ready():
-    """Bot起動時に実行される処理"""
-    # あなたのサーバーID
-    GUILD_ID = discord.Object(id=1448201700811866277)
-
-    tree.copy_global_to(guild=GUILD_ID)
-    await tree.sync(guild=GUILD_ID)
-    
-    print(f'ログインしました: {client.user}')
-    print(f'サーバー(ID: {GUILD_ID.id}) に同期しました。')
-    print('※このBotの返信は「あなただけに表示されています」となります。')
-
-# --- コマンド1: 受付メール (個別) ---
-@tree.command(name="send_entry", description="例会参加の受付完了メールを送信します")
-@app_commands.rename(
-    email_address="メールアドレス",
-    user_name="ニックネーム",
-    year="開催年",
-    month="開催月"
-)
-async def send_entry_command(
-    interaction: discord.Interaction, 
-    email_address: str, 
-    user_name: str, 
-    year: int,
-    month: int
-):
-    await interaction.response.defer(ephemeral=False)
-
-    try:
-        subject = f"【うぃーすた関東】ご参加を承りました【{year}年{month}月例会】"
-        body = f"""
-{user_name}　様
+# ==========================================
+#  共通関数: メール送信ロジック
+# ==========================================
+def send_gmail(to_email, name, year, month):
+    subject = f"【うぃーすた関東】ご参加を承りました【{year}年{month}月例会】"
+    body = f"""
+{name}　様
 
 
 お世話になっております。
@@ -96,15 +72,141 @@ X（旧 Twitter）：https://x.com/westu_kanto2
 Instagram：https://www.instagram.com/westu_kanto/
 ＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊
 """
-        msg = MIMEText(body)
-        msg['Subject'] = subject
-        msg['From'] = GMAIL_USER
-        msg['To'] = email_address
+    msg = MIMEText(body)
+    msg['Subject'] = subject
+    msg['From'] = GMAIL_USER
+    msg['To'] = to_email
 
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-            server.login(GMAIL_USER, GMAIL_PASSWORD)
-            server.send_message(msg)
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+        server.login(GMAIL_USER, GMAIL_PASSWORD)
+        server.send_message(msg)
+    
+    return body
 
+# ==========================================
+#  UI定義: ボタンを押した後の入力フォーム (Modal)
+# ==========================================
+class EntryModal(ui.Modal, title='受付メール送信の確認'):
+    def __init__(self, default_email, default_name, default_year, default_month):
+        super().__init__()
+        self.email_input = ui.TextInput(label="メールアドレス", default=default_email)
+        self.name_input = ui.TextInput(label="お名前", default=default_name)
+        self.year_input = ui.TextInput(label="開催年", default=default_year, min_length=4, max_length=4)
+        self.month_input = ui.TextInput(label="開催月", default=default_month, min_length=1, max_length=2)
+
+        self.add_item(self.email_input)
+        self.add_item(self.name_input)
+        self.add_item(self.year_input)
+        self.add_item(self.month_input)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=False)
+        try:
+            email = self.email_input.value
+            name = self.name_input.value
+            year = int(self.year_input.value)
+            month = int(self.month_input.value)
+
+            send_gmail(email, name, year, month)
+
+            # 元の指定通りのフォーマット
+            await interaction.followup.send(
+                f"受付メールを送信しました！\n"
+                f"メールアドレス: `{email}`\n"
+                f"ニックネーム: {name}\n"
+                f"対象: {year}年{month}月例会"
+            )
+            print(f"ボタン経由で送信成功: {email}")
+        except Exception as e:
+            await interaction.followup.send(f"送信に失敗しました。\nエラー内容: {e}")
+
+# ==========================================
+#  UI定義: メッセージの下に出るボタン (View)
+# ==========================================
+class EntryButtonView(ui.View):
+    def __init__(self, email, name, year, month):
+        super().__init__(timeout=None)
+        self.email = email
+        self.name = name
+        self.year = year
+        self.month = month
+
+    @discord.ui.button(label="受付メールを作成", style=discord.ButtonStyle.primary, emoji="📝")
+    async def button_callback(self, interaction: discord.Interaction, button: discord.ui.Button):
+        modal = EntryModal(self.email, self.name, self.year, self.month)
+        await interaction.response.send_modal(modal)
+
+# ==========================================
+#  イベント: メッセージ受信時の自動検知処理
+# ==========================================
+@client.event
+async def on_message(message):
+    if message.author == client.user:
+        return
+
+    # キーワード検知
+    if "**新しい参加お申し込みがありました！**" in message.content:
+        try:
+            content = message.content
+            
+            # 正規表現でデータを抜き出す
+            email_match = re.search(r"メールアドレス:\s*(.+)", content)
+            name_match = re.search(r"ニックネーム:\s*(.+)", content)
+            date_match = re.search(r"参加希望日:\s*(\d{4})[/-](\d{1,2})", content)
+
+            email = email_match.group(1).strip() if email_match else ""
+            name = name_match.group(1).strip() if name_match else ""
+            
+            if date_match:
+                year = date_match.group(1)
+                month = date_match.group(2)
+            else:
+                year = "2026"
+                month = ""
+
+            view = EntryButtonView(email, name, year, month)
+            await message.channel.send(
+                "参加お申し込みを検知しました。定員などに問題がなければ、ボタンを押して受付完了メールを送信してください。", 
+                view=view
+            )
+
+        except Exception as e:
+            print(f"自動検知エラー: {e}")
+
+# ==========================================
+#  Bot起動時の処理
+# ==========================================
+@client.event
+async def on_ready():
+    GUILD_ID = discord.Object(id=1448201700811866277)
+    tree.copy_global_to(guild=GUILD_ID)
+    await tree.sync(guild=GUILD_ID)
+    
+    print(f'ログインしました: {client.user}')
+    print(f'サーバー(ID: {GUILD_ID.id}) に同期しました。')
+    print('※ephemeral=False 設定済み')
+
+# ==========================================
+#  既存コマンド1: 受付メール (send_entry)
+# ==========================================
+@tree.command(name="send_entry", description="例会参加の受付完了メールを送信します")
+@app_commands.rename(
+    email_address="メールアドレス",
+    user_name="ニックネーム",
+    year="開催年",
+    month="開催月"
+)
+async def send_entry_command(
+    interaction: discord.Interaction, 
+    email_address: str, 
+    user_name: str, 
+    year: int,
+    month: int
+):
+    await interaction.response.defer(ephemeral=False)
+    try:
+        send_gmail(email_address, user_name, year, month)
+        # 元の指定通りのフォーマット
         await interaction.followup.send(
             f"受付メールを送信しました！\n"
             f"メールアドレス: `{email_address}`\n"
@@ -112,13 +214,13 @@ Instagram：https://www.instagram.com/westu_kanto/
             f"対象: {year}年{month}月例会"
         )
         print(f"送信成功: {email_address} / {year}年{month}月")
-
     except Exception as e:
         await interaction.followup.send(f"送信に失敗しました。\nエラー内容: {e}")
         print(f"エラー発生: {e}")
 
-
-# --- コマンド2: LINE招待メール (一斉送信) ---
+# ==========================================
+#  既存コマンド2: LINE招待 (send_line_invite)
+# ==========================================
 @tree.command(name="send_line_invite", description="LINEオープンチャットの招待リンクを一斉送信します")
 @app_commands.rename(
     emails="メールアドレス",
@@ -136,16 +238,13 @@ async def send_line_invite_command(
     await interaction.response.defer(ephemeral=False)
 
     try:
-        # メールアドレスリストの整形
         recipient_list = [addr.strip() for addr in emails.split(',')]
         bcc_string = ", ".join(recipient_list)
         count = len(recipient_list)
 
         subject = f"【うぃーすた関東】LINEオープンチャットへご参加お願いします【{year}年{month}月例会】"
-
         body = f"""
 {year}年{month}月例会に参加される皆さまへ
-
 
 お世話になっております。
 
@@ -157,7 +256,6 @@ async def send_line_invite_command(
 {url}
 
 例会に関する今後のご連絡はこちらでさせていただきます。
-
 ※オープンチャット内でのお名前はお好きなもので構いません。
 
 
@@ -174,17 +272,17 @@ X（旧 Twitter）：https://x.com/westu_kanto2
 Instagram：https://www.instagram.com/westu_kanto/
 ＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊
 """
-
         msg = MIMEText(body)
         msg['Subject'] = subject
         msg['From'] = GMAIL_USER
-        msg['To'] = GMAIL_USER # Toは自分
-        msg['Bcc'] = bcc_string # Bccに全員
+        msg['To'] = GMAIL_USER 
+        msg['Bcc'] = bcc_string
 
         with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
             server.login(GMAIL_USER, GMAIL_PASSWORD)
             server.send_message(msg)
 
+        # 元の指定通りのフォーマット
         await interaction.followup.send(
             f"オプチャの招待リンクを一斉送信しました！\n"
             f"送信数: {count} 件\n"
@@ -196,7 +294,7 @@ Instagram：https://www.instagram.com/westu_kanto/
     except Exception as e:
         await interaction.followup.send(f"送信に失敗しました。\nエラー内容: {e}")
         print(f"エラー発生: {e}")
-        
-keep_alive()
+
 # --- Botの起動 ---
+keep_alive()
 client.run(TOKEN)
