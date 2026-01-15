@@ -61,7 +61,7 @@ def send_entry_logic(to_email, name, year, month):
     # 【修正】f""" の直後に改行を追加しました
     body = f"""
 
-{name}　様
+\n{name}　様
 
 
 お世話になっております。
@@ -103,7 +103,7 @@ def send_invite_logic(emails_str, year, month, url):
     # 【修正】f""" の直後に改行を追加しました
     body = f"""
 
-{year}年{month}月例会に参加される皆さまへ
+\n{year}年{month}月例会に参加される皆さまへ
 
 
 お世話になっております。
@@ -233,7 +233,7 @@ async def on_message(message):
 
             view = EntryButtonView(email, name, year, month)
             await message.channel.send(
-                "参加お申し込みを検知しました。定員などに問題がなければ、ボタンを押して受付完了メールを送信してください。", 
+                "参加お申し込みを検知しました。定員などに問題がなければ、下のボタンを押して受付完了メールを送信してください。", 
                 view=view
             )
 
