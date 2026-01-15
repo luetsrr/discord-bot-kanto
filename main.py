@@ -196,6 +196,7 @@ Instagram：https://www.instagram.com/westu_kanto/
     except Exception as e:
         await interaction.followup.send(f"送信に失敗しました。\nエラー内容: {e}")
         print(f"エラー発生: {e}")
-
+        
+keep_alive()
 # --- Botの起動 ---
 client.run(TOKEN)
