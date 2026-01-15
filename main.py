@@ -59,7 +59,7 @@ def post_to_gas(to_email, subject, body):
 def send_entry_logic(to_email, name, year, month):
     subject = f"【うぃーすた関東】ご参加を承りました【{year}年{month}月例会】"
     # 【修正】f""" の直後に改行を追加しました
-    body = "　\n\n" + f"""{name}　様
+    body = "\u00A0\n\n" + f"""{name}　様
 
 
 お世話になっております。
@@ -99,7 +99,7 @@ def send_invite_logic(emails_str, year, month, url):
     
     subject = f"【うぃーすた関東】LINEオープンチャットへご参加お願いします【{year}年{month}月例会】"
     # 【修正】f""" の直後に改行を追加しました
-    body = "　\n\n" + f"""{year}年{month}月例会に参加される皆さまへ
+    body = "\u00A0\n\n" + f"""{year}年{month}月例会に参加される皆さまへ
 
 
 お世話になっております。
