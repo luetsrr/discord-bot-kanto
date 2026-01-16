@@ -62,7 +62,6 @@ def send_entry_logic(to_email, name, year, month):
     # 【修正】HTMLメール化したので、単純な改行(\n)だけで確実に隙間ができます。
     # \n\n\n とすることで、<br><br><br> に変換され、絶対に削除されない空白行になります。
     body = f"""
-
 {name}　様
 
 
@@ -105,13 +104,12 @@ def send_invite_logic(emails_str, year, month, url):
     
     # 【修正】こちらも単純な改行でOKです
     body = f"""
-
 {year}年{month}月例会に参加される皆さまへ
 
 
 お世話になっております。
 
-この度は、うぃーすた関東{year}年{month}月例会にご参加いただき、誠にありがとうございます。
+この度はうぃーすた関東{year}年{month}月例会にご参加いただき、誠にありがとうございます。
 
 
 例会用LINEオープンチャットを作成しましたので、下記リンクよりお忘れなくご参加お願いします。
