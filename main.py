@@ -30,8 +30,8 @@ load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 
 # ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼
-# GASのURL
-GAS_URL = "https://script.google.com/macros/s/AKfycbwIROkSxXvwObhgvUoODYiPBGwErRbpAioyGnXFoJw3AP4uraaVJJS6Xj1dq1RdPumfOg/exec"
+# 【重要】HTML対応版のGASをデプロイして、新しいURLをここに貼ってください
+GAS_URL = "https://script.google.com/macros/s/AKfycbwtYIsn8ZB5nMJvjXtZDQx6LXvEYEyLG0kH1N2rXI-FUtlBz2n5LR2jlFcFLbcgbiv49Q/exec"
 # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
 # --- Botの初期設定 ---
@@ -59,10 +59,11 @@ def post_to_gas(to_email, subject, body):
 def send_entry_logic(to_email, name, year, month):
     subject = f"【うぃーすた関東】ご参加を承りました【{year}年{month}月例会】"
     
-    # 【修正】全角スペース(\u3000) + 改行3つ(\n\n\n)
-    # これで「文字扱いされる空白」の後に「たっぷりと改行」を入れます。
-    # 多少削除されても必ず1行は隙間が残るはずです。
-    body = "\u2800\n\n" + f"""{name}　様
+    # 【修正】HTMLメール化したので、単純な改行(\n)だけで確実に隙間ができます。
+    # \n\n\n とすることで、<br><br><br> に変換され、絶対に削除されない空白行になります。
+    body = f"""
+
+{name}　様
 
 
 お世話になっております。
@@ -102,8 +103,10 @@ def send_invite_logic(emails_str, year, month, url):
     
     subject = f"【うぃーすた関東】LINEオープンチャットへご参加お願いします【{year}年{month}月例会】"
     
-    # 【修正】こちらも全角スペース + 改行3つ
-    body = "\u2800\n\n" + f"""{year}年{month}月例会に参加される皆さまへ
+    # 【修正】こちらも単純な改行でOKです
+    body = f"""
+
+{year}年{month}月例会に参加される皆さまへ
 
 
 お世話になっております。
@@ -114,6 +117,7 @@ def send_invite_logic(emails_str, year, month, url):
 例会用LINEオープンチャットを作成しましたので、下記リンクよりお忘れなくご参加お願いします。
 
 {url}
+
 
 例会に関する今後のご連絡はこちらでさせていただきます。
 ※オープンチャット内でのお名前はお好きなもので構いません。
@@ -179,12 +183,13 @@ class EntryModal(ui.Modal, title='受付完了メール送信の確認'):
 
             await interaction.followup.send(
                 f"受付完了メールを送信しました！\n"
-                f"メールアドレス: `{email}`\n"
+                f"送信先メールアドレス: `{email}`\n"
                 f"ニックネーム: {name}\n"
                 f"対象: {year}年{month}月例会"
             )
             print(f"GAS経由で送信成功: {email}")
             
+            # 元のメッセージを削除
             try:
                 await interaction.message.delete()
             except Exception:
