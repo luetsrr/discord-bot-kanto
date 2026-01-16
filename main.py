@@ -318,7 +318,7 @@ async def send_line_invite_command(
         msg = (
             f"オプチャの招待リンクを一斉送信しました！\n"
             f"送信数: {count} 件\n"
-            f"対象: {year}年{month}月\n"
+            f"対象: {year}年{month}月例会\n"
             f"リンク: {url}\n"
             f"送信先メールアドレス:\n"
             f"```\n{sent_list_str}\n```"
@@ -328,7 +328,7 @@ async def send_line_invite_command(
             msg = (
                 f"オプチャの招待リンクを一斉送信しました！\n"
                 f"送信数: {count} 件\n"
-                f"対象: {year}年{month}月\n"
+                f"対象: {year}年{month}月例会\n"
                 f"リンク: {url}\n"
                 f"送信先メールアドレス:\n"
                 f"(人数が多すぎるため表示を省略しました)"
